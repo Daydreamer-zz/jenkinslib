@@ -19,9 +19,9 @@ pipeline {
     }
     
     //参数化构建过程，和直接在web页面配置效果相同
-    // parameters { 
-        // string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: '') 
-    // }
+    parameters { 
+        string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: '') 
+    }
 
     
     stages {
@@ -57,7 +57,7 @@ pipeline {
             steps{
                 
                 //等待用户交互式输入
-                // input id: 'test', message: '是否继续', ok: '是，请继续', parameters: [choice(choices: ['a', 'b'], name: 'test1')], submitter: 'admin,user'
+                input id: 'test', message: '是否继续', ok: '是，请继续', parameters: [choice(choices: ['a', 'b'], name: 'test1')], submitter: 'admin,user'
 
                 timeout(time:30, unit:"MINUTES") {
                     script {
