@@ -10,7 +10,7 @@ def tools = new org.devops.tools()
 
 pipeline {
     agent {
-        label "slave"
+        all
     }
     
     options {
