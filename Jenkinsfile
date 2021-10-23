@@ -6,7 +6,7 @@
 //实例化jenkins shareLibrary
 //必须和sharelibrary中的目录结构一致
 def tools = new org.devops.tools()
-
+def runBuild = new org.devops.build()
 
 pipeline {
     agent any
@@ -47,11 +47,14 @@ pipeline {
                         //     sh "npm -v"
                         // }
 
-                        NODE_HOME = tool "NPM"
-                        sh """
-                        ${NODE_HOME}/bin/node -v
-                        ${NODE_HOME}/bin/npm -v
-                        """
+                        // NODE_HOME = tool "NPM"
+                        // sh """
+                        // ${NODE_HOME}/bin/node -v
+                        // ${NODE_HOME}/bin/npm -v
+                        // """
+                        
+                        //使用封装的share library
+                        runBuild("npm","-v")
                     }
                 }
             }
