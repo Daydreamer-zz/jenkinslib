@@ -44,6 +44,7 @@ pipeline {
                         // sh "${nodeHome}/bin/node -v"
                         nodejs('NODE') {
                             sh "node -v"
+                            sh "npm -v"
                         }
                     }
                 }
