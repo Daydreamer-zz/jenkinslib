@@ -48,7 +48,10 @@ pipeline {
                         // }
 
                         NODE_HOME = tool "NODE"
-                        sh "${NODE_HOME}/bin/node -v"
+                        sh """
+                        ${NODE_HOME}/bin/node -v
+                        ${NODE_HOME}/bin/npm -v
+                        """
                     }
                 }
             }
