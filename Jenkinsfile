@@ -47,7 +47,7 @@ pipeline {
                         //     sh "npm -v"
                         // }
 
-                        NODE_HOME = tool "NODE"
+                        NODE_HOME = tool "NPM"
                         sh """
                         ${NODE_HOME}/bin/node -v
                         ${NODE_HOME}/bin/npm -v
