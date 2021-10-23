@@ -88,7 +88,7 @@ pipeline {
     post {
         failure {
             script {
-                println("shit, that is a failed pipeline!!!!")
+                tools.PrintMes("shit, that is a failed pipeline!!!!", "red")
             }
         }
     }
