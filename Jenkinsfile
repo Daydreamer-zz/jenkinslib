@@ -8,6 +8,13 @@
 def tools = new org.devops.tools()
 def runBuild = new org.devops.build()
 
+
+//初始化变量
+String buildType = "${env.buildType}"
+String buildShell = "${env.buildShell}"
+
+
+
 pipeline {
     agent any
     
@@ -38,7 +45,7 @@ pipeline {
             steps{
                 timeout(time:20, unit:"MINUTES") {
                     script {
-                        println("I m building from the source code")
+                        tools.PrintMes("I m building from the source code", "green")
 
 
                         //tool 使用jenkins全局工具
@@ -54,7 +61,7 @@ pipeline {
                         // """
                         
                         //使用封装的share library
-                        runBuild.Build("npm","-v")
+                        runBuild.Build("${buildType}","${buildShell}")
                     }
                 }
             }
