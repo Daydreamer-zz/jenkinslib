@@ -9,9 +9,7 @@ def tools = new org.devops.tools()
 
 
 pipeline {
-    agent {
-        all
-    }
+    agent any
     
     options {
         timestamps()
