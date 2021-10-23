@@ -39,13 +39,16 @@ pipeline {
                 timeout(time:20, unit:"MINUTES") {
                     script {
                         println("I m building from the source code")
+
+
                         //tool 使用jenkins全局工具
-                        // nodeHome  = tool "nodejs-10"
-                        // sh "${nodeHome}/bin/node -v"
-                        nodejs('NODE') {
-                            sh "node -v"
-                            sh "npm -v"
-                        }
+                        // nodejs('NODE') {
+                        //     sh "node -v"
+                        //     sh "npm -v"
+                        // }
+
+                        NODE_HOME = tool "NODE"
+                        sh "${NODE_HOME}/bin/node -v"
                     }
                 }
             }
