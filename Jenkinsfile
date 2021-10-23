@@ -42,7 +42,7 @@ pipeline {
                         //tool 使用jenkins全局工具
                         // nodeHome  = tool "nodejs-10"
                         // sh "${nodeHome}/bin/node -v"
-                        nodejs('nodejs-10') {
+                        nodejs('NODE') {
                             sh "node -v"
                         }
                     }
