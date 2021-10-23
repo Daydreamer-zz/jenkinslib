@@ -54,7 +54,7 @@ pipeline {
                         // """
                         
                         //使用封装的share library
-                        runBuild("npm","-v")
+                        runBuild.Build("npm","-v")
                     }
                 }
             }
