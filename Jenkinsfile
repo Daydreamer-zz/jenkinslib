@@ -8,11 +8,14 @@
 def tools = new org.devops.tools()
 def runBuild = new org.devops.build()
 
+//取出当前job触发方式
+def causes = currentBuild.getBuildCauses().shortDescription[0].toString()
 
 //初始化变量
 String buildType = "${env.buildType}"
 String buildShell = "${env.buildShell}"
-
+String branchName = "${env.branchName}"
+String repoUrl = "${env.repoUrl}"
 
 
 pipeline {
@@ -24,9 +27,9 @@ pipeline {
     }
     
     //参数化构建过程，和直接在web页面配置效果相同
-    parameters { 
-        string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: '') 
-    }
+    //parameters { 
+    //    string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: '') 
+    //}
 
     
     stages {
@@ -35,8 +38,24 @@ pipeline {
             steps {
                 timeout(time:5, unit:"MINUTES") {
                     script {
-                        println("get the code from git server")
+                        tools.PrintMes("get the code from git server", "green")
+
+                        tools.PrintMes(causes.toString(), "red")
+
+                        //判断是否webhook方式触发，且是gitlab的push动作，取出分支名，并重新赋值给branchName
+                        if ( "${causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                            branchName = webhook_branch.split("/")[2]
+                            tools.PrintMes(branchName, "red")
+                        }
+
+
+                        checkout([
+                            $class: 'GitSCM', 
+                            branches: [[name: "${branchName}"]], 
+                            extensions: [], 
+                            userRemoteConfigs: [[credentialsId: "GITLAB_PASS", url: "${repoUrl}"]]])
                     }
+                    
                 }
             }
         }
@@ -47,18 +66,11 @@ pipeline {
                     script {
                         tools.PrintMes("I m building from the source code", "green")
 
-
                         //tool 使用jenkins全局工具
                         // nodejs('NODE') {
                         //     sh "node -v"
                         //     sh "npm -v"
                         // }
-
-                        // NODE_HOME = tool "NPM"
-                        // sh """
-                        // ${NODE_HOME}/bin/node -v
-                        // ${NODE_HOME}/bin/npm -v
-                        // """
                         
                         //使用封装的share library
                         runBuild.Build("${buildType}","${buildShell}")
