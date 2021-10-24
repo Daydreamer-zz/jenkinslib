@@ -19,3 +19,17 @@ def Build(buildType,buildShell){
         sh "${buildHome}/bin/${buildType}  ${buildShell}"
     }
 }
+
+def NpmBuild() {
+    println("正在构建npm项目")
+    buildHome = tool "npm"
+    sh """
+    export NODE_HOME=${buildHome}
+    export PATH=${NODE_HOME}/bin:${PATH}
+    node -v
+    npm -v
+    npm conf set registry https://registry.npm.taobao.org
+    npm install
+    npm run build
+    """
+}
