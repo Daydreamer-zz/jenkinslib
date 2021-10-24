@@ -22,7 +22,7 @@ def Build(buildType,buildShell){
 
 def NpmBuild() {
     println("正在构建npm项目")
-    buildHome = tool "npm"
+    buildHome = tool "NPM"
     sh """
     export NODE_HOME=${buildHome}
     export PATH=${NODE_HOME}/bin:${PATH}
