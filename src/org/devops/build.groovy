@@ -30,6 +30,6 @@ def NpmBuild() {
     npm -v
     npm conf set registry https://registry.npm.taobao.org
     npm install
-    npm run build
+    npm run build:h5
     """
 }
