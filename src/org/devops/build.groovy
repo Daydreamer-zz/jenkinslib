@@ -25,7 +25,7 @@ def NpmBuild() {
     buildHome = tool "NPM"
     sh """
     export NODE_HOME=${buildHome}
-    export PATH=${NODE_HOME}/bin:${PATH}
+    export export PATH=\$NODE_HOME/bin:\$PATH 
     node -v
     npm -v
     npm conf set registry https://registry.npm.taobao.org
