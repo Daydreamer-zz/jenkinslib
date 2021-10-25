@@ -8,14 +8,34 @@
 def tools = new org.devops.tools()
 def runBuild = new org.devops.build()
 
-//取出当前job触发方式
-def causes = currentBuild.getBuildCauses().shortDescription[0].toString()
-
 //初始化变量
 String buildType = "${env.buildType}"
 String buildShell = "${env.buildShell}"
 String branchName = "${env.branchName}"
 String repoUrl = "${env.repoUrl}"
+
+//取出当前job触发方式
+def job_causes = currentBuild.getBuildCauses().shortDescription[0].toString()
+
+//打印当前job触发方式(手动/webhook)
+String job_msg = "Current build method is: " + job_causes
+tools.PrintMes(job_msg, "green")
+
+
+//判断是否webhook方式触发，且是gitlab的push动作，如果条件符合，取出分支名，并重新赋值给branchName
+if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+    
+    //分割gitlab post过来的ref字段，取出分支名并赋值
+    branchName = webhook_branch.split("/")[2]
+
+    //打印gitlab webhook传过来的分支名
+    String branch_msg = "Current branch is: " + branchName
+    tools.PrintMes(branch_msg, "green")
+
+    //webhookch触发方式修改job描述
+    currentBuild.description = "Trigger by user: ${userName},The branch: ${branchName}"
+}
+
 
 
 pipeline {
@@ -38,16 +58,8 @@ pipeline {
             steps {
                 timeout(time:5, unit:"MINUTES") {
                     script {
-                        tools.PrintMes("get the code from git server", "green")
 
-                        tools.PrintMes(causes.toString(), "red")
-
-                        //判断是否webhook方式触发，且是gitlab的push动作，取出分支名，并重新赋值给branchName
-                        if ( "${causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
-                            branchName = webhook_branch.split("/")[2]
-                            tools.PrintMes(branchName, "red")
-                        }
-
+                        tools.PrintMes("Pulling Code from git server", "green")
 
                         checkout([
                             $class: 'GitSCM', 
@@ -64,14 +76,10 @@ pipeline {
             steps{
                 timeout(time:20, unit:"MINUTES") {
                     script {
-                        tools.PrintMes("I m building from the source code", "green")
+                        //tools.PrintMes("I m building from the source code", "green")
 
-                        //tool 使用jenkins全局工具
-                        // nodejs('NODE') {
-                        //     sh "node -v"
-                        //     sh "npm -v"
-                        // }
-                        
+                        String build_msg = "Curret buildType is: " + buildType
+                        tools.PrintMes(build_msg, "green")
                         //使用封装的share library
                         runBuild.Build("${buildType}","${buildShell}")
                     }
