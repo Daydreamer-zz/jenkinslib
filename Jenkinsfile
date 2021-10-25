@@ -7,6 +7,7 @@
 //必须和sharelibrary中的目录结构一致
 def tools = new org.devops.tools()
 def runBuild = new org.devops.build()
+def gitlab = new org.devops.gitlab()
 
 //初始化变量
 String buildType = "${env.buildType}"
@@ -23,6 +24,7 @@ tools.PrintMes(job_msg, "green")
 
 
 //判断是否webhook方式触发，且是gitlab的push动作，如果条件符合，取出分支名，并重新赋值给branchName
+//webhook触发器需要配置并取出如下几个变量：webhook_branch,userName,project_id,commitSha
 if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
     
     //分割gitlab post过来的ref字段，取出分支名并赋值
@@ -34,6 +36,9 @@ if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
 
     //webhookch触发方式修改job描述
     currentBuild.description = "Trigger by user: ${userName},The branch: ${branchName}"
+
+    //修改gitlab CI/CD状态为running
+    gitlab.ChangeCommitStatus(project_id, commitSha, "running")
 }
 
 
@@ -106,10 +111,27 @@ pipeline {
     }
     
     post {
+
+        success {
+            script {
+                tools.PrintMes("Build success!!!", "green")
+                gitlab.ChangeCommitStatus(project_id, commitSha, "success")
+            }
+        }
+
         failure {
             script {
                 tools.PrintMes("shit, that is a failed pipeline!!!!", "red")
+                gitlab.ChangeCommitStatus(project_id, commitSha, "failed")
             }
         }
+
+        aborted {
+            script {
+                tools.PrintMes("User aborted current job", "red")
+                gitlab.ChangeCommitStatus(project_id, commitSha, "canceled")
+            }
+        }
+
     }
 }
