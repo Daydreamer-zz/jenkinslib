@@ -102,7 +102,7 @@ pipeline {
                 timeout(time:30, unit:"MINUTES") {
                     script {
                         //调用shareLibrary中定义的方法
-                        tools.PrintMes("Jenkins share library!!!!!!!!", 'green')
+                        tools.PrintMes("Scaning the codes....", 'green')
                     }
                 
                 }
@@ -115,21 +115,30 @@ pipeline {
         success {
             script {
                 tools.PrintMes("Build success!!!", "green")
-                gitlab.ChangeCommitStatus(project_id, commitSha, "success")
+
+                //如果是gitlab webhook触发的任务，才会访问gitlab api更新状态，手动执行的不会更新状态
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, commitSha, "success")
+                }
             }
         }
 
         failure {
             script {
                 tools.PrintMes("shit, that is a failed pipeline!!!!", "red")
-                gitlab.ChangeCommitStatus(project_id, commitSha, "failed")
+                
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, commitSha, "failed")
+                }
             }
         }
 
         aborted {
             script {
                 tools.PrintMes("User aborted current job", "red")
-                gitlab.ChangeCommitStatus(project_id, commitSha, "canceled")
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, commitSha, "canceled")
+                }
             }
         }
 
