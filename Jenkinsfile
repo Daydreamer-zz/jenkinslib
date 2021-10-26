@@ -24,21 +24,21 @@ tools.PrintMes(job_msg, "green")
 
 
 //判断是否webhook方式触发，且是gitlab的push动作，如果条件符合，取出分支名，并重新赋值给branchName
-//webhook触发器需要配置并取出如下几个变量：webhook_branch,userName,project_id,commitSha
+//webhook触发器需要配置并取出如下几个变量：ref,user_username,project_id,checkout_sha
 if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
     
     //分割gitlab post过来的ref字段，取出分支名并赋值
-    branchName = webhook_branch.split("/")[2]
+    branchName = ref.split("/")[2]
 
     //打印gitlab webhook传过来的分支名
     String branch_msg = "Current branch is: " + branchName
     tools.PrintMes(branch_msg, "green")
 
     //webhookch触发方式修改job描述
-    currentBuild.description = "Trigger by user: ${userName},The branch: ${branchName}"
+    currentBuild.description = "Trigger by user: ${user_username},The branch: ${branchName}"
 
     //修改gitlab CI/CD状态为running
-    gitlab.ChangeCommitStatus(project_id, commitSha, "running")
+    gitlab.ChangeCommitStatus(project_id, checkout_sha, "running")
 }
 
 
@@ -118,7 +118,7 @@ pipeline {
 
                 //如果是gitlab webhook触发的任务，才会访问gitlab api更新状态，手动执行的不会更新状态
                 if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
-                    gitlab.ChangeCommitStatus(project_id, commitSha, "success")
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "success")
                 }
             }
         }
@@ -128,7 +128,7 @@ pipeline {
                 tools.PrintMes("shit, that is a failed pipeline!!!!", "red")
                 
                 if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
-                    gitlab.ChangeCommitStatus(project_id, commitSha, "failed")
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "failed")
                 }
             }
         }
@@ -137,7 +137,7 @@ pipeline {
             script {
                 tools.PrintMes("User aborted current job", "red")
                 if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
-                    gitlab.ChangeCommitStatus(project_id, commitSha, "canceled")
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "canceled")
                 }
             }
         }
