@@ -16,7 +16,8 @@ def SonarScan(sonarServer,projectName,projectDesc,projectPath,branchName){
     
         
         sh """ 
-            ${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${projectName} \
+            ${scannerHome}/bin/sonar-scanner \
+            -Dsonar.projectKey=${projectName} \
             -Dsonar.projectName=${projectName} \
             -Dsonar.projectVersion=${sonarDate} \
             -Dsonar.ws.timeout=30 \
