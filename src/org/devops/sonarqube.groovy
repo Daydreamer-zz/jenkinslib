@@ -23,7 +23,7 @@ def SonarScan(sonarServer,projectName,projectDesc,projectPath,branchName){
         -Dsonar.sourceEncoding=UTF-8 -Dsonar.java.binaries=target/classes \
         -Dsonar.java.test.binaries=target/test-classes \
         -Dsonar.java.surefire.report=target/surefire-reports  \
-        -Dsonar.branch.name=${branchName} \
+        -Dsonar.branch.name="${branchName}" \
         -X
         """
     }
