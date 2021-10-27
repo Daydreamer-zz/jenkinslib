@@ -8,6 +8,7 @@
 def tools = new org.devops.tools()
 def runBuild = new org.devops.build()
 def gitlab = new org.devops.gitlab()
+def sonarqube = new org.devops.sonarqube()
 
 //初始化变量
 String buildType = "${env.buildType}"
@@ -15,10 +16,8 @@ String buildShell = "${env.buildShell}"
 String branchName = "${env.branchName}"
 String repoUrl = "${env.repoUrl}"
 
-//取出当前job触发方式
+//取出当前job触发方式并打印
 def job_causes = currentBuild.getBuildCauses().shortDescription[0].toString()
-
-//打印当前job触发方式(手动/webhook)
 String job_msg = "Current build method is: " + job_causes
 tools.PrintMes(job_msg, "green")
 
@@ -35,7 +34,7 @@ if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
     tools.PrintMes(branch_msg, "green")
 
     //webhookch触发方式修改job描述
-    currentBuild.description = "Trigger by user: ${user_username},The branch: ${branchName}"
+    currentBuild.description = "Trigger by user: ${user_username}, The branch name is: ${branchName}"
 
     //修改gitlab CI/CD状态为running
     gitlab.ChangeCommitStatus(project_id, checkout_sha, "running")
@@ -103,6 +102,8 @@ pipeline {
                     script {
                         //调用shareLibrary中定义的方法
                         tools.PrintMes("Scaning the codes....", 'green')
+
+                        sonarqube.SonarScan("sonarqubeServer", JOB_NAME, currentBuild.description, WORKSPACE, branchName)
                     }
                 
                 }
