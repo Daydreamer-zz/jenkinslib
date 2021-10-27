@@ -7,11 +7,13 @@ def SonarScan(sonarServer,projectName,projectDesc,projectPath,branchName){
     withSonarQubeEnv(sonarServer){
         
         scannerHome = tool "SONAR"
+        nodeHome = tool "NPM"
         //def projectDesc = currentBuild.description
         def sonarDate = sh  returnStdout: true, script: 'date  "+%Y-%m-%d %H:%M:%S"'
         sonarDate = sonarDate - "\n"
         
         sh """
+        export PATH=${nodeHome}/bin:${PATH}
         ${scannerHome}/bin/sonar-scanner \
         -Dsonar.projectKey="${projectName}" \
         -Dsonar.projectName="${projectName}" \
