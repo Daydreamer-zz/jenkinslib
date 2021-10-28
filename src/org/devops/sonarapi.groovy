@@ -30,7 +30,7 @@ def GetProjectStatus(projectName, branchName){
     
     //println(response)
     
-   return response
+   return result
 }
 
 //搜索Sonar项目
