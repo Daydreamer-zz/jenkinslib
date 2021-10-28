@@ -20,12 +20,13 @@ def HttpReq(reqType,reqUrl,reqBody){
 
 
 //获取Sonar质量阈状态
-def GetProjectStatus(projectName){
-    apiUrl = "project_branches/list?project=${projectName}"
+def GetProjectStatus(projectName, branchName){
+    // apiUrl = "project_branches/list?project=${projectName}"
+    apiUrl = "qualitygates/project_status?projectKey=${projectName}&branch=${branchName}"
     response = HttpReq("GET",apiUrl,'')
     
     response = readJSON text: """${response.content}"""
-    result = response["branches"][0]["status"]["qualityGateStatus"]
+    result = response["projectStatus"]["status"]
     
     //println(response)
     
