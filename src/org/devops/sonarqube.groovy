@@ -31,8 +31,10 @@ def SonarScan(sonarServer,projectName,projectDesc,projectPath,branchName){
         """
     }
     
-    def qg = waitForQualityGate()
-    if (qg.status != 'OK') {
-        error "Pipeline aborted due to quality gate failure: ${qg.status}"
-    }
+
+    //这个方式一直PENDING???
+    // def qg = waitForQualityGate()
+    // if (qg.status != 'OK') {
+        // error "Pipeline aborted due to quality gate failure: ${qg.status}"
+    // }
 }
