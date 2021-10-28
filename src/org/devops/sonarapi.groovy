@@ -6,7 +6,7 @@ package org.devops
 def HttpReq(reqType,reqUrl,reqBody){
     def sonarServer = "http://sona.node1.com/api"
    
-    result = httpRequest authentication: 'SONAR_TOKEN',
+    result = httpRequest authentication: 'SONAR_API',
             httpMode: reqType, 
             contentType: "APPLICATION_JSON",
             consoleLogResponseBody: true,
