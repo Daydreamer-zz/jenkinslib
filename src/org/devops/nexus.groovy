@@ -44,7 +44,7 @@ def MavenUpload(){
                                 -Dfile=${jarName} -DgroupId=${pomGroupId} \
                                 -DartifactId=${pomArtifact} -Dversion=${pomVersion}  \
                                 -Dpackaging=${pomPackaging} -DrepositoryId=maven-hostd \
-                                -Durl=http://192.168.1.200:30083/repository/maven-hostd 
+                                -Durl=http://nexus.node1.com/repository/maven-hostd 
         """
 }
 
