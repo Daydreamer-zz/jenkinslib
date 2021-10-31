@@ -4,8 +4,8 @@ pakcage org.devops
 //获取POM中的坐标
 def GetGav(){
    //上传制品
-    // def jarName = sh returnStdout: true, script: "cd target;ls *.jar"
-    jarName = sh returnStdout: true, script: "cd target;ls *.jar"
+    def jarName = sh returnStdout: true, script: "cd target;ls *.jar"
+    // jarName = sh returnStdout: true, script: "cd target;ls *.jar"
     env.jarName = jarName - "\n"
     
     def pom = readMavenPom file: 'pom.xml'
