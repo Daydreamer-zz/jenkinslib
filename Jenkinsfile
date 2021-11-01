@@ -9,6 +9,7 @@ def tools = new org.devops.tools()
 def runBuild = new org.devops.build()
 def gitlab = new org.devops.gitlab()
 def sonarqube = new org.devops.sonarqube()
+def sonarapi = new org.devops.sonarapi()
 
 //初始化变量
 String buildType = "${env.buildType}"
@@ -104,11 +105,54 @@ pipeline {
                         tools.PrintMes("Scaning the codes....", 'green')
 
                         sonarqube.SonarScan("sonarqubeServer", JOB_NAME, currentBuild.description, WORKSPACE, branchName)
+
+                        def scanResult = sonarapi.GetProjectStatus(JOB_NAME, branchName)
+                        if (scanResult.toString() == "ERROR") {
+                            error " 代码质量阈错误！请及时修复！"
+                        } else {
+                            println(scanResult)
+                        }
                     }
                 
                 }
             }
         }
+
+        stage("Upload to maven"){
+        steps {
+            timeout(time:30, unit:"MINUTES") {
+                script {
+                    def jarName = sh returnStdout: true, script: "cd target;ls *.jar"
+                    // jarName = sh returnStdout: true, script: "cd target;ls *.jar"
+                    env.jarName = jarName - "\n"
+                    
+                    def pom = readMavenPom file: 'pom.xml'
+                    env.pomVersion = "${pom.version}"
+                    env.pomArtifact = "${pom.artifactId}"
+                    env.pomPackaging = "${pom.packaging}"
+                    env.pomGroupId = "${pom.groupId}"
+                    
+                    println("${pomGroupId}-${pomArtifact}-${pomVersion}-${pomPackaging}")
+
+                    // return ["${pomGroupId}","${pomArtifact}","${pomVersion}","${pomPackaging}"]
+
+                    def mvnHome = tool "M2"
+                    sh  """ 
+                        cd target/
+                        ${mvnHome}/bin/mvn deploy:deploy-file \
+                        -Dmaven.test.skip=true  \
+                        -DgroupId=${pomGroupId} \
+                        -DartifactId=${pomArtifact} \
+                        -Dversion=${pomVersion}  \
+                        -Dpackaging=${pomPackaging} \
+                        -DrepositoryId=maven-snapshots \
+                        -Durl=http://nexus.node1.com/repository/maven-snapshots \
+                        -Dfile=${jarName} 
+                        """
+                }
+            }
+        }
+    }
     }
     
     post {
