@@ -10,6 +10,7 @@ def runBuild = new org.devops.build()
 def gitlab = new org.devops.gitlab()
 def sonarqube = new org.devops.sonarqube()
 def sonarapi = new org.devops.sonarapi()
+def nexus = new org.devops.nexus()
 
 //初始化变量
 String buildType = "${env.buildType}"
@@ -122,33 +123,16 @@ pipeline {
         steps {
             timeout(time:30, unit:"MINUTES") {
                 script {
-                    def jarName = sh returnStdout: true, script: "cd target;ls *.jar"
-                    // jarName = sh returnStdout: true, script: "cd target;ls *.jar"
-                    env.jarName = jarName - "\n"
-                    
-                    def pom = readMavenPom file: 'pom.xml'
-                    env.pomVersion = "${pom.version}"
-                    env.pomArtifact = "${pom.artifactId}"
-                    env.pomPackaging = "${pom.packaging}"
-                    env.pomGroupId = "${pom.groupId}"
-                    
-                    println("${pomGroupId}-${pomArtifact}-${pomVersion}-${pomPackaging}")
+                    //调用nexus封装sharelibrary初始化pom配置信息为全局变量
+                    nexus.GetGav()
 
-                    // return ["${pomGroupId}","${pomArtifact}","${pomVersion}","${pomPackaging}"]
+                    // 调用nexus封装sharelibrary执行mvn deploy上传制品
+                    // nexus.MavenUpload()
 
-                    def mvnHome = tool "M2"
-                    sh  """ 
-                        cd target/
-                        ${mvnHome}/bin/mvn deploy:deploy-file \
-                        -Dmaven.test.skip=true  \
-                        -DgroupId=${pomGroupId} \
-                        -DartifactId=${pomArtifact} \
-                        -Dversion=${pomVersion}  \
-                        -Dpackaging=${pomPackaging} \
-                        -DrepositoryId=maven-snapshots \
-                        -Durl=http://nexus.node1.com/repository/maven-snapshots \
-                        -Dfile=${jarName} 
-                        """
+                    //调用nexusArtifactUploader插件上传制品
+                    env.repoName = "maven-snapshots"
+                    env.filePath = "target/${jarName}"
+                    nexus.NexusUpload()
                 }
             }
         }
@@ -189,3 +173,4 @@ pipeline {
 
     }
 }
+
