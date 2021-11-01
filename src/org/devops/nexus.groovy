@@ -29,7 +29,7 @@ def NexusUpload(){
                                         type: "${pomPackaging}"]], 
                             credentialsId: 'nexus-admin-user', 
                             groupId: "${pomGroupId}", 
-                            nexusUrl: '192.168.1.200:30083', 
+                            nexusUrl: 'http://nexus.node1.com', 
                             nexusVersion: 'nexus3', 
                             protocol: 'http', 
                             repository: "${repoName}", 
@@ -39,15 +39,18 @@ def NexusUpload(){
 //mvn deploy
 def MavenUpload(){          
     def mvnHome = tool "M2"
-    sh  """ 
-        cd target/
-        ${mvnHome}/bin/mvn \
-        deploy:deploy-file -Dmaven.test.skip=true  \
-        -Dfile=${jarName} -DgroupId=${pomGroupId} \
-        -DartifactId=${pomArtifact} -Dversion=${pomVersion}  \
-        -Dpackaging=${pomPackaging} -DrepositoryId=maven-hostd \
-        -Durl=http://nexus.node1.com/repository/maven-hostd 
-        """
+    sh  """
+    cd target/
+    ${mvnHome}/bin/mvn deploy:deploy-file \
+    -Dmaven.test.skip=true  \
+    -DgroupId=${pomGroupId} \
+    -DartifactId=${pomArtifact} \
+    -Dversion=${pomVersion}  \
+    -Dpackaging=${pomPackaging} \
+    -DrepositoryId=maven-snapshots \
+    -Durl=http://nexus.node1.com/repository/maven-snapshots \
+    -Dfile=${jarName} 
+    """
 }
 
 //制品晋级
@@ -62,7 +65,7 @@ def ArtifactUpdate(updateType,artifactUrl){
 
         //获取artifactID 
         
-        artifactUrl = artifactUrl -  "http://192.168.1.200:30083/repository/maven-hostd/"
+        artifactUrl = artifactUrl -  "http://http://nexus.node1.com/repository/maven-hostd/"
         artifactUrl = artifactUrl.split("/").toList()
         
         println(artifactUrl.size())
