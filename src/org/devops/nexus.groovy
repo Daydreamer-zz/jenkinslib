@@ -27,9 +27,9 @@ def NexusUpload(){
                                         classifier: '', 
                                         file: "${filePath}", 
                                         type: "${pomPackaging}"]], 
-                            credentialsId: 'nexus-admin-user', 
+                            credentialsId: 'NEXUS_PASS', 
                             groupId: "${pomGroupId}", 
-                            nexusUrl: 'http://nexus.node1.com', 
+                            nexusUrl: 'nexus.node1.com', 
                             nexusVersion: 'nexus3', 
                             protocol: 'http', 
                             repository: "${repoName}", 
@@ -95,7 +95,7 @@ def main(uploadType){
     if ("${uploadType}" == "maven"){
         MavenUpload()
     } else if ("${uploadType}" == "nexus") {
-        env.repoName = "maven-hostd"
+        env.repoName = "maven-snapshots"
         env.filePath = "target/${jarName}"
         NexusUpload()
     }
