@@ -19,7 +19,6 @@ def HttpReq(reqType,reqUrl,reqBody){
 
 
 //获取仓库中所有组件
-
 def GetRepoComponents(repoName){
     apiUrl = "/v1/components?repository=${repoName}"
     response = HttpReq("GET",apiUrl,'')
@@ -32,7 +31,6 @@ def GetRepoComponents(repoName){
 
 
 //获取单件组件
-
 def GetComponentsId(repoName,groupId,artifactId,version){
     println("获取单件组件ID")
     result = GetRepoComponents(repoName) 
