@@ -65,7 +65,7 @@ def ArtifactUpdate(updateType,artifactUrl){
 
         //获取artifactID 
         
-        artifactUrl = artifactUrl -  "http://http://nexus.node1.com/repository/maven-hostd/"
+        artifactUrl = artifactUrl -  "http://nexus.node1.com/repository/maven-snapshots/"
         artifactUrl = artifactUrl.split("/").toList()
         
         println(artifactUrl.size())
