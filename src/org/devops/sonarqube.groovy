@@ -9,8 +9,8 @@ def SonarScan(sonarServer,projectName,projectDesc,projectPath,branchName){
         scannerHome = tool "SONAR"
         nodeHome = tool "NPM"
         //def projectDesc = currentBuild.description
-        def sonarDate = sh  returnStdout: true, script: 'date  "+%Y-%m-%d %H:%M:%S"'
-        sonarDate = sonarDate - "\n"
+        def now = new Date()
+        def sonarDate = now.format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone('Asia/Shanghai'))
         
         sh """
         export PATH=${nodeHome}/bin:${PATH}
