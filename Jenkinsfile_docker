@@ -1,0 +1,199 @@
+#!groovy
+
+//引用jenkins shareLibrary
+@Library('jenkinslib') _
+
+//实例化jenkins shareLibrary
+//必须和sharelibrary中的目录结构一致
+def tools = new org.devops.tools()
+def runBuild = new org.devops.build()
+def gitlab = new org.devops.gitlab()
+def sonarqube = new org.devops.sonarqube()
+def sonarapi = new org.devops.sonarapi()
+def nexus = new org.devops.nexus()
+
+//初始化变量
+String buildType = "${env.buildType}"
+String buildShell = "${env.buildShell}"
+String branchName = "${env.branchName}"
+String repoUrl = "${env.repoUrl}"
+
+//取出当前job触发方式并打印
+def job_causes = currentBuild.getBuildCauses().shortDescription[0].toString()
+String job_msg = "Current build method is: " + job_causes
+tools.PrintMes(job_msg, "green")
+
+
+//判断是否webhook方式触发，且是gitlab的push动作，如果条件符合，取出分支名，并重新赋值给branchName
+//webhook触发器需要配置并取出如下几个变量：ref,user_username,project_id,checkout_sha
+if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+    
+    //分割gitlab post过来的ref字段，取出分支名并赋值
+    branchName = ref.split("/")[2]
+
+    //打印gitlab webhook传过来的分支名
+    String branch_msg = "Current branch is: " + branchName
+    tools.PrintMes(branch_msg, "green")
+
+    //webhookch触发方式修改job描述
+    currentBuild.description = "Trigger by user: ${user_username}, The branch name is: ${branchName}"
+
+    //修改gitlab CI/CD状态为running
+    gitlab.ChangeCommitStatus(project_id, checkout_sha, "running")
+}
+
+
+
+pipeline {
+    agent {
+        label "master"
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds() //禁止并行
+        
+    }
+    
+    //参数化构建过程，和直接在web页面配置效果相同
+    //parameters { 
+    //    string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: '') 
+    //}
+
+    
+    stages {
+        
+        stage("Get Code") {
+            steps {
+                timeout(time:5, unit:"MINUTES") {
+                    script {
+
+                        tools.PrintMes("Pulling Code from git server", "green")
+
+                        checkout([
+                            $class: 'GitSCM', 
+                            branches: [[name: "${branchName}"]], 
+                            extensions: [], 
+                            userRemoteConfigs: [[credentialsId: "GITLAB_PASS", url: "${repoUrl}"]]])
+                    }
+                    
+                }
+            }
+        }
+        
+        stage("Building") {
+            agent {
+                docker{
+                    image "maven:3.8-openjdk-8"
+                    args "-v /data/devops/jenkins/m2cache:/var/maven/.m2 -e MAVEN_CONFIG=/var/maven/.m2 -e TZ=Asia/Shanghai -e LC_ALL=C.UTF-8"
+                    reuseNode true //默认为false，jenkins使用docker agent构建会生成一个jobName@2的目录，并在这个目录构建，设为true则会复用原来目录
+                }
+            }
+            steps{
+                timeout(time:20, unit:"MINUTES") {
+                    script {
+                        sh """
+                        mvn clean package -DskipTests -Duser.home=/var/maven
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage("Code Scan") {
+            agent {
+                docker {
+                    image "sonarsource/sonar-scanner-cli:4.6"
+                    args "--add-host sona.node1.com:192.168.2.10 -e TZ=Asia/Shanghai -e LC_ALL=C.UTF-8 -v /etc/localtime:/etc/localtime"
+                    reuseNode true
+                }
+            }
+
+            steps{
+                
+                //等待用户交互式输入
+                // input id: 'test', message: '是否继续', ok: '是，请继续', parameters: [choice(choices: ['a', 'b'], name: 'test1')], submitter: 'admin,user'
+
+                timeout(time:30, unit:"MINUTES") {
+                    script {
+                        withSonarQubeEnv("sonarqubeServer"){
+                
+                            // def sonarDate = sh  returnStdout: true, script: 'date  "+%Y-%m-%d %H:%M:%S"'
+                            def now = new Date()
+                            def sonarDate = now.format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone('Asia/Shanghai'))
+                            
+                            sh """
+                            sonar-scanner \
+                            -Dsonar.projectKey="${JOB_NAME}" \
+                            -Dsonar.projectName="${JOB_NAME}" \
+                            -Dsonar.projectVersion="${sonarDate}" \
+                            -Dsonar.ws.timeout=30 \
+                            -Dsonar.links.homepage=http://www.baidu.com \
+                            -Dsonar.sources="${WORKSPACE}" \
+                            -Dsonar.sourceEncoding=UTF-8 \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.java.test.binaries=target/test-classes \
+                            -Dsonar.java.surefire.report=target/surefire-reports  \
+                            -Dsonar.branch.name="${branchName}" 
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Upload to maven"){
+            steps {
+                timeout(time:30, unit:"MINUTES") {
+                    script {
+                        //调用nexus封装sharelibrary初始化pom配置信息为全局变量
+                        nexus.GetGav()
+
+                        // 调用nexus封装sharelibrary执行mvn deploy上传制品
+                        // nexus.MavenUpload()
+
+                        //调用nexusArtifactUploader插件上传制品
+                        env.repoName = "maven-snapshots"
+                        env.filePath = "target/${jarName}"
+                        nexus.NexusUpload()
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+
+        success {
+            script {
+                tools.PrintMes("Build success!!!", "green")
+
+                //如果是gitlab webhook触发的任务，才会访问gitlab api更新状态，手动执行的不会更新状态
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "success")
+                }
+            }
+        }
+
+        failure {
+            script {
+                tools.PrintMes("shit, that is a failed pipeline!!!!", "red")
+                
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "failed")
+                }
+            }
+        }
+
+        aborted {
+            script {
+                tools.PrintMes("User aborted current job", "red")
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "canceled")
+                }
+            }
+        }
+
+    }
+}
+
