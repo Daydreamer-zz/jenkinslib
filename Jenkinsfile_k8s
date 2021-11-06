@@ -1,0 +1,303 @@
+#!groovy
+
+//引用jenkins shareLibrary
+@Library('jenkinslib') _
+
+//实例化jenkins shareLibrary
+//必须和sharelibrary中的目录结构一致
+def tools = new org.devops.tools()
+def gitlab = new org.devops.gitlab()
+def sonarapi = new org.devops.sonarapi()
+
+//初始化变量
+String branchName = "${env.branchName}"
+String repoUrl = "${env.repoUrl}"
+String commitID
+String commitMessage
+String imageTag
+
+//取出当前job触发方式并打印
+def job_causes = currentBuild.getBuildCauses().shortDescription[0].toString()
+String job_msg = "Current build method is: " + job_causes
+tools.PrintMes(job_msg, "green")
+
+
+//判断是否webhook方式触发，且是gitlab的push动作，如果条件符合，取出分支名，并重新赋值给branchName
+//webhook触发器需要配置并取出如下几个变量：ref,user_username,project_id,checkout_sha
+if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+    
+    //分割gitlab post过来的ref字段，取出分支名并赋值
+    branchName = ref.split("/")[2]
+
+    //打印gitlab webhook传过来的分支名
+    String branch_msg = "Current branch is: " + branchName
+    tools.PrintMes(branch_msg, "green")
+
+    //webhookch触发方式修改job描述
+    currentBuild.description = "Trigger by user: ${user_username}, The branch name is: ${branchName}"
+
+    //修改gitlab CI/CD状态为running
+    gitlab.ChangeCommitStatus(project_id, checkout_sha, "running")
+}
+
+
+
+pipeline {
+    agent {
+        kubernetes {
+            // label "build-pod"
+            cloud "kubernetes"
+            workspaceVolume persistentVolumeClaimWorkspaceVolume(claimName: 'jenkins-agent-pvc', readOnly: false)
+            yaml """
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    k8s-app: jenkins-agent
+  name: jenkins-agent
+  namespace: devops
+spec:
+  dnsPolicy: ClusterFirstWithHostNet
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:4.10-3
+      imagePullPolicy: IfNotPresent
+      tty: true
+      env:
+        - name: "LANGUAGE"
+          value: "en_US:en"
+        - name: "LC_ALL"
+          value: "en_US.UTF-8"
+        - name: "LANG"
+          value: "en_US.UTF-8"
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      volumeMounts:
+        - mountPath: "/etc/localtime"
+          name: "localtime"
+          readOnly: false
+    - name: maven
+      image: maven:3.8-openjdk-8
+      imagePullPolicy: IfNotPresent
+      tty: true
+      command:
+        - "cat"
+      env:
+        - name: "MAVEN_CONFIG"
+          value: "/var/maven/.m2"
+        - name: "LC_ALL"
+          value: "C.UTF-8"
+      volumeMounts:
+        - name: m2cache
+          mountPath: "/var/maven/.m2"
+    - name: sonar-scanner
+      image: sonarsource/sonar-scanner-cli:4.6
+      imagePullPolicy: IfNotPresent
+      tty: true
+      command:
+        - "cat"
+    - name: docker
+      image: docker:20.10.10
+      imagePullPolicy: IfNotPresent
+      tty: true
+      command:
+        - "cat"
+      volumeMounts:
+        - name: docker-socket
+          mountPath: "/var/run/docker.sock"
+          readOnly: false
+  nodeSelector:
+    build: "true"
+  volumes:
+    - name: "localtime"
+      hostPath:
+        path: "/usr/share/zoneinfo/Asia/Shanghai"
+    - name: m2cache
+      persistentVolumeClaim:
+        claimName: m2cache
+    - name: docker-socket
+      hostPath:
+        path: "/var/run/docker.sock"
+            """
+        }
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds() //禁止并行
+        
+    }
+    
+    
+    stages {
+        
+        stage("Get Code") {
+            steps {
+                timeout(time:5, unit:"MINUTES") {
+                    script {
+
+                        tools.PrintMes("Pulling Code from git server", "green")
+
+                        checkout([
+                            $class: 'GitSCM', 
+                            branches: [[name: "${branchName}"]], 
+                            extensions: [], 
+                            userRemoteConfigs: [[credentialsId: "GITLAB_PASS", url: "${repoUrl}"]]])
+                    }
+                    
+                }
+            }
+        }
+
+        stage("Init config") {
+            steps {
+                script {
+                    commitID = sh returnStdout: true, script: "git log -n 1 --pretty=format:'%h'"
+                    commitID = commitID - "\n"
+                    def now = new Date()
+                    def curDate = now.format("yyMMdd-HHmmss", TimeZone.getTimeZone('Asia/Shanghai'))
+                    imageTag = curDate + "-" + commitID + "-" + branchName
+                    println(imageTag)
+                }
+            }
+        }
+        
+        stage("Building") {
+            steps{
+                timeout(time:20, unit:"MINUTES") {
+                    container(name: "maven") {
+                        script {
+                            sh """
+                            mvn clean package -DskipTests -Duser.home=/var/maven
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("code Scan && Upload to nexus") {
+            parallel {
+                stage("Code Scan") {
+                    steps{
+                        timeout(time:30, unit:"MINUTES") {
+                            container(name: "sonar-scanner") {
+                                script {
+                                    withSonarQubeEnv("sonarqubeServer"){
+                                        def now = new Date()
+                                        def sonarDate = now.format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone('Asia/Shanghai'))
+
+                                        sh """
+                                        sonar-scanner \
+                                        -Dsonar.projectKey="${JOB_NAME}" \
+                                        -Dsonar.projectName="${JOB_NAME}" \
+                                        -Dsonar.projectVersion="${sonarDate}" \
+                                        -Dsonar.ws.timeout=30 \
+                                        -Dsonar.links.homepage=http://www.baidu.com \
+                                        -Dsonar.sources="${WORKSPACE}" \
+                                        -Dsonar.sourceEncoding=UTF-8 \
+                                        -Dsonar.java.binaries=target/classes \
+                                        -Dsonar.java.test.binaries=target/test-classes \
+                                        -Dsonar.java.surefire.report=target/surefire-reports  \
+                                        -Dsonar.branch.name="${branchName}" 
+                                        """
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                stage("Upload to nexus"){
+                    steps {
+                        timeout(time:30, unit:"MINUTES") {
+                            script {
+                                def jarName = sh returnStdout: true, script: "cd target;ls *.jar"
+                                jarName = jarName - "\n"
+
+                                def repoName = "maven-snapshots"
+                                def filePath = "target/${jarName}"
+                                def pom = readMavenPom file: 'pom.xml'
+
+                                nexusArtifactUploader artifacts: [[artifactId: "${pom.artifactId}",
+                                                                   classifier: '',
+                                                                   file: "${filePath}",
+                                                                   type: "${pom.packaging}"]],
+                                                      credentialsId: 'NEXUS_PASS',
+                                                      groupId: "${pom.groupId}",
+                                                      nexusUrl: 'nexus.node1.com',
+                                                      nexusVersion: 'nexus3',
+                                                      protocol: 'http',
+                                                      repository: "${repoName}",
+                                                      version: "${pom.version}"
+                            }
+                        }
+                    }
+                }
+
+                stage("Build image") {
+                    steps {
+                        timeout(time:10, unit:"MINUTES") {
+                            container(name: "docker") {
+                                withCredentials ([usernamePassword(credentialsId: 'HARBOR_PASS', passwordVariable: 'Password', usernameVariable: 'Username')]) {
+                                    sh """
+                                    docker build -t ${harborAddress}/${registryDir}/${JOB_NAME}:${imageTag} .
+                                    docker login -u ${Username} -p ${Password} ${harborAddress}
+                                    docker push ${harborAddress}/${registryDir}/${JOB_NAME}:${imageTag}
+
+                                    docker rmi ${harborAddress}/${registryDir}/${JOB_NAME}:${imageTag}
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+
+    
+    post {
+
+        success {
+            script {
+                tools.PrintMes("Build success!!!", "green")
+                archiveArtifacts artifacts: 'target/*.jar', followSymlinks: false, onlyIfSuccessful: true
+
+                //如果是gitlab webhook触发的任务，才会访问gitlab api更新状态，手动执行的不会更新状态
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "success")
+                }
+            }
+        }
+
+        failure {
+            script {
+                tools.PrintMes("shit, that is a failed pipeline!!!!", "red")
+                
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "failed")
+                }
+            }
+        }
+
+        aborted {
+            script {
+                tools.PrintMes("User aborted current job", "red")
+                if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+                    gitlab.ChangeCommitStatus(project_id, checkout_sha, "canceled")
+                }
+            }
+        }
+
+    }
+}
+
