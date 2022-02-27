@@ -1,0 +1,222 @@
+#!groovy
+
+//引用jenkins shareLibrary
+@Library('jenkinslib') _
+
+def tools = new org.devops.tools()
+
+//取出当前job触发方式并打印
+def job_causes = currentBuild.getBuildCauses().shortDescription[0].toString()
+def job_msg = "Current build method is: " + job_causes
+tools.PrintMes(job_msg, "green")
+
+//初始化全局变量
+String repoUrl = "http://gitlab.node1.com/devops/spring-boot-project.git"
+String HARBOR_ADDRESS = "harbor.node1.com"
+String HARBOR_PROJECT_NAME = "devops"
+String IMAGE_NAME = "spring-demo"
+String IMAGE_TAG
+
+
+pipeline {
+    agent {
+        kubernetes {
+            // label "build-pod"
+            cloud "kubernetes"
+            // workspaceVolume persistentVolumeClaimWorkspaceVolume(claimName: 'jenkins-agent-pvc', readOnly: false)
+            yaml """
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  labels:
+    k8s-app: jenkins-agent
+  name: jenkins-agent
+  namespace: devops
+spec:
+  dnsPolicy: ClusterFirstWithHostNet
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:4.10-3
+      imagePullPolicy: IfNotPresent
+      tty: true
+      env:
+        - name: "LANGUAGE"
+          value: "en_US:en"
+        - name: "LC_ALL"
+          value: "en_US.UTF-8"
+        - name: "LANG"
+          value: "en_US.UTF-8"
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      volumeMounts:
+        - mountPath: "/etc/localtime"
+          name: "localtime"
+          readOnly: false
+    - name: maven
+      image: maven:3.8-openjdk-8
+      imagePullPolicy: IfNotPresent
+      tty: true
+      command:
+        - "cat"
+      env:
+        - name: "MAVEN_CONFIG"
+          value: "/var/maven/.m2"
+        - name: "LC_ALL"
+          value: "C.UTF-8"
+      volumeMounts:
+        - name: m2cache
+          mountPath: "/var/maven/.m2"
+    - name: docker
+      image: docker:20.10.10
+      imagePullPolicy: IfNotPresent
+      tty: true
+      command:
+        - "cat"
+      volumeMounts:
+        - name: docker-socket
+          mountPath: "/var/run/docker.sock"
+          readOnly: false
+  nodeSelector:
+    build: "true"
+  volumes:
+    - name: "localtime"
+      hostPath:
+        path: "/usr/share/zoneinfo/Asia/Shanghai"
+    - name: m2cache
+      persistentVolumeClaim:
+        claimName: m2cache
+    - name: docker-socket
+      hostPath:
+        path: "/var/run/docker.sock"
+            """
+        }
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds() //禁止并行
+        
+    }
+
+    parameters {
+
+        listGitBranches(
+            name: 'branchName', 
+            branchFilter: 'refs/heads/(.*)',
+            defaultValue: 'master',
+            type: 'BRANCH',
+            remoteURL: repoUrl,
+            credentialsId: 'GITLAB_PASS',
+            sortMode: 'DESCENDING_SMART'
+        )
+    
+		    choice(name: 'SonarQube', choices: ['False','True'],description: '')				 
+    
+    }
+    
+    stages {        
+        stage("Get Code") {
+            parallel {
+
+              stage("Pulling code manually"){
+                when {
+                  expression {
+                    env.runOpts == null
+                  }
+                }
+                steps{
+                  checkout(
+                    [
+                      $class: 'GitSCM', 
+                      branches: [[name: "${branchName}"]], 
+                      extensions: [], 
+                      userRemoteConfigs: [[credentialsId: "GITLAB_PASS", url: repoUrl]]
+                    ]
+                  )
+                }
+              }
+
+              stage("Pulling code by trigger"){
+                when {
+                  expression {
+                    env.runOpts != null
+                  }
+                }
+
+                steps {
+                  script {
+                    if ( "${runOpts}" == "Gitlab_Push")  {
+                      //分割gitlab post过来的ref字段，取出分支名并赋值
+                      branchName = ref.split("/")[2]
+                    }
+                    checkout(
+                      [
+                        $class: 'GitSCM', 
+                        branches: [[name: "${branchName}"]], 
+                        extensions: [], 
+                        userRemoteConfigs: [[credentialsId: "GITLAB_PASS", url: repoUrl]]
+                      ]
+                    )
+                  }
+                }
+              }
+            }
+        }
+
+
+        stage("Init config"){
+
+          steps {
+            script {
+              def COMMIT_ID = sh(returnStdout: true, script: "git log -n 1 --pretty=format:'%h'").trim()
+              def now = new Date()
+              def curDate = now.format("yyMMdd_HHmmss", TimeZone.getTimeZone('Asia/Shanghai'))
+              IMAGE_TAG = COMMIT_ID + "-" + curDate
+              println("The image tag is ${IMAGE_TAG}")
+            }
+          }
+        }
+
+
+        stage("Building") {
+            steps{
+                timeout(time:20, unit:"MINUTES") {
+                    container(name: "maven") {
+                        script {
+                            tools.PrintMes("当前构建分支 ${branchName}", "green")
+                            sh """
+                            mvn clean package -DskipTests -Duser.home=/var/maven
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+
+        stage("BUild image") {
+            steps{
+                container(name: "docker") {
+                    script {
+                       withCredentials ([usernamePassword(credentialsId: 'HARBOR_PASS', passwordVariable: 'Password', usernameVariable: 'Username')]) {
+                            def IMAGE_ADDRESS = HARBOR_ADDRESS + "/" + HARBOR_PROJECT_NAME + "/" + IMAGE_NAME + ":" + IMAGE_TAG
+                            println("full image adress is ${IMAGE_ADDRESS}")
+                            sh """
+                            docker build -t ${IMAGE_ADDRESS} .
+
+                            docker login -u ${Username} -p ${Password} ${IMAGE_ADDRESS}
+                            docker push ${IMAGE_ADDRESS}
+                            """
+                      }
+                    }
+                }
+            }
+        }
+    }
+}
