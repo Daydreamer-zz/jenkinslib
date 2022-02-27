@@ -17,6 +17,11 @@ String HARBOR_PROJECT_NAME = "devops"
 String IMAGE_NAME = "spring-demo"
 String IMAGE_TAG
 
+if ( "${job_causes}" == "Generic Cause" && "${runOpts}" == "Gitlab_Push")  {
+  branchName = ref.split("/")[2]
+  currentBuild.description = "Trigger by user: ${user_username}, branch name: ${branchName}"
+}
+
 
 pipeline {
     agent {
@@ -96,6 +101,33 @@ spec:
         path: "/var/run/docker.sock"
             """
         }
+    }
+
+    triggers {
+      GenericTrigger (
+        causeString: 'Generic Cause', 
+        genericRequestVariables: [
+          [key: 'runOpts', regexpFilter: '']
+        ], 
+        genericVariables: [
+          [defaultValue: '', key: 'ref', regexpFilter: '', value: '$.ref'], 
+          [defaultValue: '', key: 'object_kind', regexpFilter: '', value: '$.object_kind'], 
+          [defaultValue: '', key: 'before', regexpFilter: '', value: '$.before'], 
+          [defaultValue: '', key: 'after', regexpFilter: '', value: '$.after'],
+          [defaultValue: '', key: 'user_username', regexpFilter: '', value: '$.user_username']
+        ],
+        printContributedVariables: true,
+        printPostContent: true,
+
+        //过滤创建和删除分支
+        //过滤非dev开头的分支
+        regexpFilterExpression: '^push\\s(?!0{40}).{40}\\s(?!0{40}).{40} refs/heads/dev.*$',
+        regexpFilterText: '$object_kind $before $after $ref',
+
+        silentResponse: true,
+        token: 'wdnmd', 
+        tokenCredentialId: ''
+      )
     }
 
     options {
