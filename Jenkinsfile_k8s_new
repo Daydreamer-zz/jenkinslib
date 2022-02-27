@@ -2,7 +2,6 @@
 
 //引用jenkins shareLibrary
 @Library('jenkinslib') _
-
 def tools = new org.devops.tools()
 
 //取出当前job触发方式并打印
@@ -12,6 +11,7 @@ tools.PrintMes(job_msg, "green")
 
 //初始化全局变量
 String repoUrl = "http://gitlab.node1.com/devops/spring-boot-project.git"
+String branchName = "${env.branchName}"
 String HARBOR_ADDRESS = "harbor.node1.com"
 String HARBOR_PROJECT_NAME = "devops"
 String IMAGE_NAME = "spring-demo"
@@ -154,15 +154,7 @@ spec:
     
     stages {        
         stage("Get Code") {
-            parallel {
-
-              stage("Pulling code manually"){
-                when {
-                  expression {
-                    env.runOpts == null
-                  }
-                }
-                steps{
+          steps{
                   checkout(
                     [
                       $class: 'GitSCM', 
@@ -172,33 +164,6 @@ spec:
                     ]
                   )
                 }
-              }
-
-              stage("Pulling code by trigger"){
-                when {
-                  expression {
-                    env.runOpts != null
-                  }
-                }
-
-                steps {
-                  script {
-                    if ( "${runOpts}" == "Gitlab_Push")  {
-                      //分割gitlab post过来的ref字段，取出分支名并赋值
-                      branchName = ref.split("/")[2]
-                    }
-                    checkout(
-                      [
-                        $class: 'GitSCM', 
-                        branches: [[name: "${branchName}"]], 
-                        extensions: [], 
-                        userRemoteConfigs: [[credentialsId: "GITLAB_PASS", url: repoUrl]]
-                      ]
-                    )
-                  }
-                }
-              }
-            }
         }
 
 
