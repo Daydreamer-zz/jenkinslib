@@ -147,8 +147,8 @@ spec:
             credentialsId: 'GITLAB_PASS',
             sortMode: 'DESCENDING_SMART'
         )
-    
-		    choice(name: 'SonarQube', choices: ['False','True'],description: '')				 
+	
+	choice(name: 'SonarQube', choices: ['False','True'],description: '')				 
     
     }
     
