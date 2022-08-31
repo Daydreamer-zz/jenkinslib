@@ -10,7 +10,7 @@ def job_msg = "Current build method is: " + job_causes
 tools.PrintMes(job_msg, "green")
 
 //初始化全局变量
-String repoUrl = "http://code-hekpz193.elinkint.com/sunhongze/springboot-helloworld.git"
+String repoUrl = "http://xxxx.gitlab.com/sunhongze/springboot-helloworld.git"
 String branchName = "${env.branchName}"
 String HARBOR_ADDRESS = "harbor.node1.com"
 String HARBOR_PROJECT_NAME = "devops"
@@ -40,7 +40,7 @@ spec:
     - name: harbor
   containers:
     - name: jnlp
-      image: harbor.node1.com/jenkins/inbound-agent:4.10-3-jdk11
+      image: jenkins/inbound-agent:4.10-3-jdk11
       imagePullPolicy: Always
       tty: true
       env:
@@ -55,7 +55,7 @@ spec:
           name: localtime
           readOnly: false
     - name: maven
-      image: harbor.node1.com/maven/maven:3.8-openjdk-8
+      image: maven:3.8-openjdk-8
       imagePullPolicy: Always
       tty: true
       command:
@@ -69,7 +69,7 @@ spec:
         - name: m2cache
           mountPath: /var/maven/.m2
     - name: docker
-      image: harbor.node1.com/docker/docker:19.03-dind
+      image: docker:19.03-dind
       args: ["--registry-mirror", "https://kc95fq7u.mirror.aliyuncs.com", "--insecure-registry", "harbor.node1.com"]
       imagePullPolicy: Always
       tty: true
